@@ -2,6 +2,8 @@ package com.geko.convertgeko.Controller;
 
 import com.geko.convertgeko.Utils.Opcion;
 import com.geko.convertgeko.Utils.Validations;
+import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -11,12 +13,15 @@ import javafx.scene.input.MouseEvent;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+
 import java.io.File;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.ResourceBundle;
+
 import static com.geko.convertgeko.Utils.Validations.*;
 
 
@@ -37,6 +42,7 @@ public class HelloController implements Initializable {
     public RadioButton filtro;
     public TextField textFiltroHojas;
     public RadioButton Radiopdf_word;
+    public RadioButton Radioword_pdf;
     private Stage primaryStage;
     private FileChooser fileSelect;
     private File file;
@@ -44,21 +50,27 @@ public class HelloController implements Initializable {
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
-
+        filtro.setVisible(false);
+        textFiltroHojas.setVisible(false);
         comboBoxOrientacion.setValue("Vertical");
         comboBoxOrientacion.getItems().addAll(Opcion.Orientacion);
         comboBoxHoja.setValue("A4");
         comboBoxHoja.getItems().addAll(Opcion.Hoja);
 
         labelSaveArchivo.setText(System.getProperty("user.home"));
-
+        File archivo = new File("CovertWordPdf.py");
+        if (!archivo.exists()) {
+            System.out.println("OJO: ¡¡No existe el archivo de Python!!");
+        } else {
+            System.out.println("Si existe");
+            System.out.println("patch file"+ archivo.getAbsoluteFile().getAbsolutePath());
+        }
     }
-
     public void btnSelectAction(ActionEvent actionEvent) {
 
         primaryStage = new Stage();
         fileSelect = new FileChooser();
-        String filter = Validations.isSelectedFilter(Radiojpg_pdf.isSelected(), RadioUnir_pdf.isSelected(), RadioSeparar_pdf.isSelected(), RadioPng_pdf.isSelected(),Radiopdf_word.isSelected());
+        String filter = Validations.isSelectedFilter(Radiojpg_pdf.isSelected(), RadioUnir_pdf.isSelected(), RadioSeparar_pdf.isSelected(), RadioPng_pdf.isSelected(),Radiopdf_word.isSelected(),Radioword_pdf.isSelected());
         if (!filter.equals("not")) {
 
             if (labelSaveArchivo.getText().equals("") || labelSaveArchivo.getText().equals(System.getProperty("user.home"))) {
@@ -93,10 +105,49 @@ public class HelloController implements Initializable {
 
 
     }
-
-
     public void btnGenerarAction(ActionEvent actionEvent) {
-        progreesBar.setVisible(true);
+        Task<Void> tarea = crearTareaDemorada();
+        new Thread(tarea).start();
+    }
+    public void btnSaveArchivoPressed(ActionEvent actionEvent) {
+        primaryStage = new Stage();
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Selecciona una carpeta");
+        directoryChooser.setInitialDirectory(new File(System.getProperty("user.home"))); // Directorio inicial
+        try {
+            File selectedDirectory = directoryChooser.showDialog(primaryStage);
+            if (selectedDirectory != null) {
+                labelSaveArchivo.setText(selectedDirectory.getAbsolutePath());
+            }
+        } catch (Exception e) {
+
+        }
+
+    }
+    public void RadioSeparar_pdfAction(MouseEvent mouseEvent) {
+        filtro.setVisible(true);
+        textFiltroHojas.setVisible(true);
+    }
+    public void filtroAction(ActionEvent actionEvent) {
+
+            if (!filtro.isSelected()){
+                textFiltroHojas.setDisable(true);
+            }else{
+                textFiltroHojas.setDisable(false);
+            }
+
+
+    }
+    @FXML
+    public void filtrohojasKeyType(KeyEvent keyEvent) {
+        char key = keyEvent.getCharacter().charAt(0);
+        if(!Character.isDigit(key)){
+            keyEvent.consume();
+        }
+
+
+    }
+    private void startProcess() {
         if (file != null || fileList != null) {
             if (Radiojpg_pdf.isSelected()) {
                 String save = labelSaveArchivo.getText() + "\\" + FilterExt(file) + "_Geko.pdf";
@@ -186,6 +237,33 @@ public class HelloController implements Initializable {
                 }
 
             }
+            if (Radioword_pdf.isSelected()) {
+                Alert alertI = new Alert(Alert.AlertType.CONFIRMATION);
+                alertI.setHeaderText(null);
+                alertI.setTitle("Validacion");
+                alertI.setHeaderText("¿Estas de Seguro?");
+                Optional<ButtonType> action = alertI.showAndWait();
+
+                if (action.get() == ButtonType.OK) {
+                    String pathoutput = labelSaveArchivo.getText() + "\\" + "Geko_word_pdf.pdf";
+                    if (pathoutput != null) {
+                        File archivo = new File("CovertWordPdf.py");
+                        if (!archivo.exists()) {
+                            System.out.println("OJO: ¡¡No existe el archivo de Python!!");
+                        }else{
+                            System.out.println("patch file"+ archivo.getAbsoluteFile().getAbsolutePath());
+                            if (WordToPDFConverter(file.getAbsolutePath(), pathoutput, Opcion.WORD_APLICATION, archivo.getAbsoluteFile().getAbsolutePath())) {
+                                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                                alert.setTitle("Muy Bien");
+                                alert.setHeaderText("Documento Guardado en: ");
+                                alert.setContentText("Ruta: " + pathoutput);
+                                alert.showAndWait();
+                            }
+                        }
+                    }
+                }
+
+            }
         } else {
 
             Alert alert = new Alert(Alert.AlertType.WARNING);
@@ -194,63 +272,59 @@ public class HelloController implements Initializable {
             alert.setContentText("al parecer no ha Seleccionado ningun archivo!");
             alert.showAndWait();
         }
-        labelFilePath.setText("Seleccione un Archivo");
-        Radiojpg_pdf.selectedProperty().set(false);
-        RadioPng_pdf.selectedProperty().set(false);
-        RadioSeparar_pdf.selectedProperty().set(false);
-        RadioUnir_pdf.selectedProperty().set(false);
-        //labelSaveArchivo.setText(System.getProperty("user.home"));
-        progreesBar.setVisible(false);
-    }
 
-    public void btnSaveArchivoPressed(ActionEvent actionEvent) {
-        primaryStage = new Stage();
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Selecciona una carpeta");
-        directoryChooser.setInitialDirectory(new File(System.getProperty("user.home"))); // Directorio inicial
-        try {
-            File selectedDirectory = directoryChooser.showDialog(primaryStage);
-            if (selectedDirectory != null) {
-                labelSaveArchivo.setText(selectedDirectory.getAbsolutePath());
+    }
+    private Task<Void> crearTareaDemorada() {
+        return new Task<Void>() {
+            @Override
+            protected Void call() throws Exception {
+                // Simular un proceso demorado
+
+                    // Actualizar la interfaz gráfica desde el hilo de JavaFX
+                    Platform.runLater(() -> {
+                        progreesBar.setVisible(true);
+                        startProcess();
+                    });
+
+                // Actualizar la interfaz gráfica después de completar el proceso
+                Platform.runLater(() -> {
+                    labelFilePath.setText("Seleccione un Archivo");
+                    Radiojpg_pdf.selectedProperty().set(false);
+                    RadioPng_pdf.selectedProperty().set(false);
+                    RadioSeparar_pdf.selectedProperty().set(false);
+                    RadioUnir_pdf.selectedProperty().set(false);
+                    //labelSaveArchivo.setText(System.getProperty("user.home"));
+                    progreesBar.setVisible(false);
+                    System.out.println("Proceso completado");
+                });
+
+                return null;
             }
-        } catch (Exception e) {
-
-        }
-
+        };
+    }
+    public void Radiojpg_pdfOnAcction(ActionEvent actionEvent) {
+        dividirhabilitar();
     }
 
-
-    public void RadioSeparar_pdfAction(MouseEvent mouseEvent) {
-        if (RadioSeparar_pdf.isPressed()){
-            if (RadioSeparar_pdf.isSelected()){
-                filtro.setDisable(true);
-            }else{
-                filtro.setDisable(false);
-            }
-
-        }
-
+    public void RadioUnir_PdfOnAcction(ActionEvent actionEvent) {
+        dividirhabilitar();
     }
 
-
-    public void filtroAction(ActionEvent actionEvent) {
-
-            if (!filtro.isSelected()){
-                textFiltroHojas.setDisable(true);
-            }else{
-                textFiltroHojas.setDisable(false);
-            }
-
-
+    public void RadioPng_pdfOnAcction(ActionEvent actionEvent) {
+        dividirhabilitar();
     }
 
-    @FXML
-    public void filtrohojasKeyType(KeyEvent keyEvent) {
-        char key = keyEvent.getCharacter().charAt(0);
-        if(!Character.isDigit(key)){
-            keyEvent.consume();
-        }
-
-
+    public void Radiopdf_wordOnAction(ActionEvent actionEvent) {
+        dividirhabilitar();
     }
+
+    public void Radioword_pdfOnAction(ActionEvent actionEvent) {
+        dividirhabilitar();
+    }
+
+    private void dividirhabilitar(){
+        filtro.setVisible(false);
+        textFiltroHojas.setVisible(false);
+    }
+
 }

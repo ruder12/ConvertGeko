@@ -1,6 +1,9 @@
 package com.geko.convertgeko.Utils;
 
 
+import com.itextpdf.text.pdf.PdfReader;
+import com.itextpdf.text.pdf.parser.PdfTextExtractor;
+import com.itextpdf.text.pdf.parser.SimpleTextExtractionStrategy;
 import javafx.scene.control.ComboBox;
 import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.apache.pdfbox.multipdf.Splitter;
@@ -11,28 +14,23 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream.AppendMode;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
-import com.itextpdf.text.Document;
-import com.itextpdf.text.pdf.PdfReader;
-import com.itextpdf.text.pdf.parser.PdfTextExtractor;
-import com.itextpdf.text.pdf.parser.SimpleTextExtractionStrategy;
-import javax.imageio.ImageIO;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.*;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 
 
 public class Validations {
 
 
-    public static String isSelectedFilter(Boolean Radiojpg_pdf, Boolean RadioUnir_pdf, Boolean RadioSeparar_pdf, Boolean RadioPng_pdf,Boolean Radiopdf_word) {
-        if (!Radiojpg_pdf && !RadioUnir_pdf && !RadioSeparar_pdf && !RadioPng_pdf && !Radiopdf_word) {
+    public static String isSelectedFilter(Boolean Radiojpg_pdf, Boolean RadioUnir_pdf, Boolean RadioSeparar_pdf, Boolean RadioPng_pdf,Boolean Radiopdf_word,Boolean Radioword_pdf) {
+        if (!Radiojpg_pdf && !RadioUnir_pdf && !RadioSeparar_pdf && !RadioPng_pdf && !Radiopdf_word && !Radioword_pdf) {
             return "not";
         }
         if (Radiojpg_pdf) return "*.jpg";
@@ -40,6 +38,7 @@ public class Validations {
         if (RadioSeparar_pdf) return "*.pdf";
         if (RadioPng_pdf) return "*.png";
         if (Radiopdf_word) return "*.pdf";
+        if (Radioword_pdf) return "*.docx";
         return "not";
     }
 
@@ -100,6 +99,10 @@ public class Validations {
 
             BufferedImage imag = ImageIO.read(new File(imagePath));
             if (imag != null) {
+                if (WatermarkExample(document) != null) {
+                    document = WatermarkExample(document);
+                    System.out.println("documento marcado");
+                }
                 PDImageXObject image = LosslessFactory.createFromImage(document, ImageIO.read(new File(imagePath)));
                 PDPageContentStream contentStream = new PDPageContentStream(document, page, AppendMode.APPEND, true);
                 PDRectangle pageSize = page.getMediaBox();
@@ -111,6 +114,8 @@ public class Validations {
 
                 document.save(pdfPath);
                 document.close();
+
+
             }
 
         } catch (IOException e) {
@@ -205,10 +210,79 @@ public class Validations {
             }
     }
 
-    public static boolean PDFToWordConverterFormat(String pdfFilePath,String wordFilePath) {
-       return false;
+    public static boolean WordToPDFConverter(String file_input, String fileouput, String application,String pathPY) {
+        try {
+
+                    String rutaScriptPython = pathPY;
+                    String rutaArchivoEntrada = file_input;
+                    String rutaArchivoSalida = fileouput;
+                    String typeAplication = application;
+                    System.out.println("----------------------");
+
+                    // Comando para ejecutar el script de Python con los argumentos
+                    String[] comando = {"python", rutaScriptPython, rutaArchivoEntrada, rutaArchivoSalida, typeAplication};
+
+                    // Crear el proceso
+                    ProcessBuilder pb = new ProcessBuilder(comando);
+
+                    // Redirigir la salida estándar y error a la consola
+                    pb.redirectErrorStream(true);
+
+                    // Iniciar el proceso
+                    Process proceso = pb.start();
+
+                    // Leer la salida del proceso
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(proceso.getInputStream()));
+                    String linea;
+                    while ((linea = reader.readLine()) != null) {
+                        System.out.println(linea);
+                    }
+
+                    // Esperar a que el proceso termine
+                    int exitCode = proceso.waitFor();
+                    System.out.println("El proceso ha terminado con código de salida: " + exitCode);
+                    return true;
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
+    public static boolean PDFToWordConverterFormat(String pdfFilePath, String wordFilePath) {
+        return false;
+    }
+
+    public static PDDocument WatermarkExample(PDDocument document) {
+
+        try {
+            // Ruta de la imagen de la marca de agua
+            //Validations.class.getClassLoader().getResource("img/watermark.jpg");
+            URL watermarkImagePath = Validations.class.getResource("/img/watermark.jpg");
+
+            if (watermarkImagePath != null) {
+                System.out.println(watermarkImagePath.toString());
+                System.out.println(watermarkImagePath.getPath());
+                PDImageXObject image = PDImageXObject.createFromFile(watermarkImagePath.toString(), document);
+
+                for (PDPage page : document.getPages()) {
+                    PDRectangle pageSize = page.getMediaBox();
+                    float pageWidth = pageSize.getWidth();
+                    float pageHeight = pageSize.getHeight();
+
+                    PDPageContentStream contentStream = new PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true, true);
+                    contentStream.drawImage(image, 0, 0, image.getWidth(), image.getHeight());
+                    contentStream.close();
+                }
+
+                System.out.println("Marca de agua agregada al PDF.");
+                return document;
+            }
+            System.out.println("no encontro la ruta de la imagen.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
 
 }
